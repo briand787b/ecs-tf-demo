@@ -1,114 +1,169 @@
-resource "aws_vpc" "cluster-vpc" {
-  cidr_block = "10.0.0.0/16"
-
-  tags = {
-    Name = "Cluster-VPC"
-    IAC  = "Sandbox"
-  }
+data "aws_availability_zones" "available" {
+    state = "available"
 }
 
-resource "aws_internet_gateway" "cluster-igw" {
-  vpc_id = aws_vpc.cluster-vpc.id
+resource "aws_vpc" "sandbox" {
+    cidr_block = "10.0.0.0/16"
 
-  tags = {
-    Name = "Cluster-IGW"
-    IAC  = "Sandbox"
-  }
+    tags = {
+        Name = "Sandbox"
+        IaC = "Sandbox"
+    }
 }
 
+resource "aws_security_group" "allow_all" {
+    name = "demo-allow-all"
+    vpc_id = aws_vpc.sandbox.id
 
-resource "aws_subnet" "private-subnet" {
-  vpc_id = aws_vpc.cluster-vpc.id
-  count  = length(var.availability_zone_names)
+    ingress {
+        from_port = 0
+        to_port = 65535
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
 
-  cidr_block        = "10.0.${count.index + 1}.0/24"
-  availability_zone = var.availability_zone_names[count.index]
+    egress {
+        from_port = 0
+        to_port = 65535
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
 
-  tags = {
-    Name = "Private-Subnet-${count.index + 1}"
-    IAC  = "Sandbox"
-  }
+    tags = {
+        IaC = "Sandbox"
+    }
 }
 
-resource "aws_subnet" "public-subnet" {
-  vpc_id = aws_vpc.cluster-vpc.id
-  count  = length(var.availability_zone_names)
+resource "aws_subnet" "public-a" {
+    vpc_id = aws_vpc.sandbox.id
+    cidr_block = "10.0.0.0/24"
+    availability_zone = data.aws_availability_zones.available.names[0]
 
-  cidr_block        = "10.0.${count.index + 1 + length(var.availability_zone_names)}.0/24"
-  availability_zone = var.availability_zone_names[count.index]
-
-  tags = {
-    Name = "Public-Subnet-${count.index + 1}"
-    IAC  = "Sandbox"
-  }
+    tags = {
+        Name = "Sandbox-Public-A"
+        IaC = "Sandbox"
+    }
 }
 
-resource "aws_eip" "cluster-ngw-eip" {
-  vpc                       = true
-  associate_with_private_ip = "10.0.${length(var.availability_zone_names) + 1}.5"
-  depends_on                = [aws_internet_gateway.cluster-igw]
+resource "aws_subnet" "private-a" {
+    vpc_id = aws_vpc.sandbox.id
+    cidr_block = "10.0.1.0/24"
+    availability_zone = data.aws_availability_zones.available.names[0]
 
-  tags = {
-    Name = "Cluster-NATGW-EIP"
-    IAC  = "Sandbox"
-  }
+    tags = {
+        Name = "Sandbox-Private-A"
+        IaC = "Sandbox"
+    }
 }
 
+resource "aws_subnet" "public-b" {
+    vpc_id = aws_vpc.sandbox.id
+    cidr_block = "10.0.2.0/24"
+    availability_zone = data.aws_availability_zones.available.names[1]
 
-resource "aws_nat_gateway" "cluster-natgw" {
-  allocation_id = aws_eip.cluster-ngw-eip.id
-  subnet_id     = element(aws_subnet.public-subnet, 0).id
-
-  tags = {
-    Name = "Cluster-NAT-Gateway"
-    IAC  = "Sandbox"
-  }
+    tags = {
+        Name = "Sandbox-Public-B"
+        IaC = "Sandbox"
+    }
 }
 
+resource "aws_subnet" "private-b" {
+    vpc_id = aws_vpc.sandbox.id
+    cidr_block = "10.0.3.0/24"
+    availability_zone = data.aws_availability_zones.available.names[1]
 
-resource "aws_route_table" "public-rt" {
-  vpc_id = aws_vpc.cluster-vpc.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.cluster-igw.id
-  }
-
-  tags = {
-    Name = "Public-Route-Table"
-    IAC  = "Sandbox"
-  }
-
+    tags = {
+        Name = "Sandbox-Private-B"
+        IaC = "Sandbox"
+    }
 }
 
-resource "aws_route_table" "private-rt" {
-  vpc_id = aws_vpc.cluster-vpc.id
+resource "aws_route_table" "public" {
+    vpc_id = aws_vpc.sandbox.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.cluster-natgw.id
-  }
+    tags = {
+        Name = "Sandbox-Public"
+        IaC = "Sandbox"
+    }
 }
 
-resource "aws_route_table_association" "public-rta" {
-  count = length(aws_subnet.public-subnet)
+resource "aws_route_table" "private-a" {
+    vpc_id = aws_vpc.sandbox.id
 
-  subnet_id      = element(aws_subnet.public-subnet, count.index).id
-  route_table_id = aws_route_table.public-rt.id
+    tags = {
+        Name = "Sandbox-Private-A"
+        IaC = "Sandbox"
+    }
 }
 
-resource "aws_route_table_association" "private-rta" {
-  count = length(aws_subnet.private-subnet)
+resource "aws_route_table" "private-b" {
+    vpc_id = aws_vpc.sandbox.id
 
-  subnet_id      = element(aws_subnet.private-subnet, count.index).id
-  route_table_id = aws_route_table.private-rt.id
+    tags = {
+        Name = "Sandbox-Private-B"
+        IaC = "Sandbox"
+    }
 }
 
-# resource "aws_network_acl" "private-nacl" {
-#   vpc_id = aws_vpc.cluster-vpc.id
-#   subnet_ids = [for sn in aws_subnet.private-subnet : sn.id]
+resource "aws_route_table_association" "public-a" {
+    subnet_id = aws_subnet.public-a.id
+    route_table_id = aws_route_table.public.id
+}
 
-#   tags = {
-#       Name = "Private-NACL"
-#   }
-# }
+resource "aws_route_table_association" "public-b" {
+    subnet_id = aws_subnet.public-b.id
+    route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "private-a" {
+    subnet_id = aws_subnet.private-a.id
+    route_table_id = aws_route_table.private-a.id
+}
+
+resource "aws_route_table_association" "private-b" {
+    subnet_id = aws_subnet.private-b.id
+    route_table_id = aws_route_table.private-b.id
+}
+
+resource "aws_internet_gateway" "igw" {
+    vpc_id = aws_vpc.sandbox.id
+
+    tags = {
+        Name = "Sandbox-Internet-Gateway"
+        IaC = "Sandbox"
+    }
+}
+
+resource "aws_route" "igw-public" {
+    route_table_id = aws_route_table.public.id
+    destination_cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+}
+
+resource "aws_eip" "nat-gateway" {
+    vpc = true
+}
+
+resource "aws_nat_gateway" "ngw" {
+    allocation_id = aws_eip.nat-gateway.id
+    subnet_id = aws_subnet.public-a.id
+
+    depends_on = [ aws_internet_gateway.igw ]
+
+    tags = {
+        Name = "Sandbox-NAT-Gateway"
+        IaC = "Sandbox"
+    }
+}
+
+resource "aws_route" "ngw-private-a" {
+    route_table_id = aws_route_table.private-a.id
+    destination_cidr_block = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.ngw.id
+}
+
+resource "aws_route" "ngw-private-b" {
+    route_table_id = aws_route_table.private-b.id
+    destination_cidr_block = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.ngw.id
+}

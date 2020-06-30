@@ -16,23 +16,23 @@ terraform {
 data "aws_availability_zones" "available" {}
 
 module "network" {
-  source = "./modules/microservices/network"
+  source = "./modules/network"
 }
 
-# module "hello-world" {
-#   source = "./modules/hello-world"
-# }
+module "ecs" {
+  source = "./modules/ecs"
 
-# module "network" {
-#   source = "./modules/network"
+  private_subnet_ids = module.network.private_subnet_ids
+  public_subnet_ids = module.network.public_subnet_ids
+  sg_id = module.network.allow_all_sg_id
+  vpc_id = module.network.vpc_id
+  igw = module.network.igw
+}
 
-#   availability_zone_names = data.aws_availability_zones.available.names
-# }
+module "ec2" {
+  source = "./modules/ec2"
 
-# module "ecs" {
-#   source = "./modules/ecs"
-
-#   vpc_id = module.network.vpc_id
-#   public_subnets = "${module.network.private_subnets}"
-#   private_subnets = "${module.network.public_subnets}"
-# }
+  sg_id = module.network.allow_all_sg_id
+  public_subnet_ids = module.network.public_subnet_ids
+  private_subnet_ids = module.network.private_subnet_ids
+}

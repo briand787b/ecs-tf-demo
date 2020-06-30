@@ -1,74 +1,56 @@
-// TASKS
-
-data "aws_iam_policy_document" "task_trust_policy_doc" {
-  version = "2012-10-17"
-  statement {
-    sid     = "ECSTaskTrustPolicy"
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
+data "aws_iam_role" "ecs-service-linked-role" {
+    name = "AWSServiceRoleForECS"
 }
 
-resource "aws_iam_role" "demo_task_role" {
-  name = "demo_task_role"
+### just for demonstration ###
+resource "aws_iam_role" "demo_ecs_role_task_assume" {
+  name = "demo_ecsfargate_task_assume"
 
-  assume_role_policy = data.aws_iam_policy_document.task_trust_policy_doc.json
-
-  tags = {
-    IAC  = "Sandbox"
-    Name = "demo_task_role"
-  }
-}
-
-resource "aws_iam_role" "frontend_task_role" {
-  name = "frontend_task_role"
-
-  assume_role_policy = data.aws_iam_policy_document.task_trust_policy_doc.json
-
-  tags = {
-    IAC  = "Sandbox"
-    Name = "frontend_task_role"
-  }
-}
-
-data "aws_iam_policy_document" "task_permissions_policy_doc" {
-  version = "2012-10-17"
-  statement {
-    sid    = "CityStockTaskRolePermissionsPolicy"
-    effect = "Allow"
-    actions = [
-      "ecr:GetAuthorizationToken",
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:BatchGetImage",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents"
+  assume_role_policy = <<EOF
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+        "Sid": "",
+        "Effect": "Allow",
+        "Principal": {
+            "Service": "ecs-tasks.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+        }
     ]
-    resources = ["*"]
+  }
+  EOF
+
+  tags = {
+      IaC = "Sandbox"
   }
 }
 
-resource "aws_iam_policy" "task_permissions_policy" {
-  name   = "ECSTaskPermissionsPolicy"
-  policy = data.aws_iam_policy_document.task_permissions_policy_doc.json
+resource "aws_iam_role_policy" "demo_ecs_task_assume_policy" {
+  name = "demo_ecsfargate_task_assume_policy"
+  role = aws_iam_role.demo_ecs_role_task_assume.id
 
-  # tags = {
-  #   IAC = "Sandbox"
-  #   Name = "ECSTaskPermissionsPolicy"
-  # }
+  policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "ssm:GetParameters",
+                "secretsmanager:GetSecretValue",
+                "kms:Decrypt"
+            ],
+            "Resource": "*"
+        }
+    ]
 }
-
-resource "aws_iam_role_policy_attachment" "demo_task_attachment" {
-  role       = aws_iam_role.demo_task_role.name
-  policy_arn = aws_iam_policy.task_permissions_policy.arn
-}
-
-resource "aws_iam_role_policy_attachment" "frontend_task_attachment" {
-  role       = aws_iam_role.frontend_task_role.name
-  policy_arn = aws_iam_policy.task_permissions_policy.arn
+EOF
 }
