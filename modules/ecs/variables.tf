@@ -17,3 +17,7 @@ variable "vpc_id" {
 variable "igw" {
     description = "the internet gateway"
 }
+
+variable "go-svc_env_arn" {
+    type = string
+}

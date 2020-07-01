@@ -27,6 +27,7 @@ module "ecs" {
   sg_id = module.network.allow_all_sg_id
   vpc_id = module.network.vpc_id
   igw = module.network.igw
+  go-svc_env_arn = module.ssm.go-svc_env_arn
 }
 
 module "ec2" {
@@ -35,4 +36,10 @@ module "ec2" {
   sg_id = module.network.allow_all_sg_id
   public_subnet_ids = module.network.public_subnet_ids
   private_subnet_ids = module.network.private_subnet_ids
+}
+
+module "ssm" {
+  source = "./modules/ssm"
+
+  go-svc_env = var.go-svc_env
 }

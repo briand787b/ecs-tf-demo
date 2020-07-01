@@ -36,7 +36,7 @@ resource "aws_ecs_task_definition" "go-svc" {
     container_definitions = <<EOT
         [{
             "name": "go-svc",
-            "image": "nginx:latest",
+            "image": "briand787b/go-svc:latest",
             "cpu": 256,
             "memory": 512,
             "essential": true,
@@ -46,7 +46,11 @@ resource "aws_ecs_task_definition" "go-svc" {
                     "hostPort": 80,
                     "protocol": "tcp"
                 }
-            ]
+            ],
+            "secrets": [{
+                "name": "ENV",
+                "valueFrom": "${var.go-svc_env_arn}"
+            }]
         }]
     EOT
 
